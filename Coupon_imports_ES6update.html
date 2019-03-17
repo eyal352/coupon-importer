@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Yotpo Coupon Importer</title>
+    <style>
+        input {
+        margin-bottom: 10px;
+        width: 300px;
+    }
+    sup {
+        color: grey;
+    }
+    input[type=radio]{
+        width: 23px;
+    }
+    </style>
+</head>
+
+<body>
+    <form id="couponForm" onsubmit="submitCoupons(); return false;">
+        <p>Import Coupons to Yotpo Account</p>
+        <br>
+        <input type="text" id="orderBox" placeholder="CouponID1, CouponID2, Coupon..." required="required"> <sup> space separated values only </sup>
+        <br>
+        <input type="text" id="appkey" placeholder="appKey" required="required"> <sup> AppKey </sup>
+        <br>
+        <input type="text" id="appsecret" placeholder="appSecret" required="required"> <sup> AppSecret </sup>
+        <br>
+        <input type="radio" name="CouponType" value="map_review" required="required"> Write Review
+        <br>
+        <input type="radio" name="CouponType" value="map_review_share"> Write & Share Review
+        <br>
+        <input type="submit" 3>
+    </form>
+    <p id="successMessage"> </p>
+    <script type="text/javascript">
+
+    function submitCoupons() {
+        var totalCoupons = document.getElementById('orderBox').value.split(' '),
+            submitBtn = document.querySelector('input[type="submit"]'),
+            successMsg = document.querySelector('#successMessage'),
+            couponType = document.querySelector('input[name=CouponType]:checked').value;
+
+        var yoAppkey = document.querySelector('#appkey').value,
+            yoSecret = document.querySelector('#appsecret').value,
+            utoken;
+
+        var batchCoupons = [],
+            i,
+            len;
+
+        var data = JSON.stringify({
+            "client_id": yoAppkey,
+            "client_secret": yoSecret,
+            "grant_type": "client_credentials"
+        });;
+        //uToken request
+        fetch('https://api.yotpo.com/oauth/token', {
+                headers: { "Content-Type": "application/json; charset=utf-8" },
+                method: 'POST',
+                body: data
+            })
+            .then(response => response.json())
+            .then(oAuthResponse => {
+                utoken = oAuthResponse.access_token;
+                //loop through array to make API requests 10k at a time
+                for (i = 0, len = totalCoupons.length; i < len; i += 1000) {
+                    batchCoupons.push(totalCoupons.slice(i, i + 1000));
+                }
+                return batchCoupons;
+            })
+            .then(batchCoupons => {
+                for (i = 0, len = batchCoupons.length; i < len; i++) {
+                    var couponCodes = batchCoupons[i];
+                    var jsonBody = JSON.stringify({
+                        "utoken": utoken,
+                        "coupon_action": couponType,
+                        "codes": couponCodes
+                    });
+                    // Ordered API call to submit Coupons
+                    fetch(`https://api.yotpo.com/apps/${yoAppkey}/coupons/unique`, {
+                            headers: { "Content-Type": "application/json" },
+                            method: 'POST',
+                            body: jsonBody
+                        })
+                        .then(response => console.log(response.json()))
+                        .catch(error => console.log(error.json()))
+                }
+            })
+    }
+    </script>
+</body>
+
+</html>
